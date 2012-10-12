@@ -22,7 +22,7 @@
 #include <bsd_auth.h>
 #endif
 
-// eclipse (4.2.1) doesn't recognize the following cpp flags
+// eclipse (4.2.1) doesn't recognize the following cpp flags from config.mk
 #ifndef COLOR1
 #define COLOR1 "black"
 #endif
