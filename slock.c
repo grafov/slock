@@ -1,4 +1,3 @@
-
 /* See LICENSE file for license details. */
 #define _XOPEN_SOURCE 500
 #if HAVE_SHADOW_H
@@ -23,19 +22,36 @@
 #include <bsd_auth.h>
 #endif
 
+// eclipse (4.2.1) doesn't recognize the following cpp flags
+#ifndef COLOR1
+#define COLOR1 "black"
+#endif
+
+#ifndef COLOR2
+#define COLOR2 "#005577"
+#endif
+
+#ifndef COLOR3
+#define COLOR3 "#ff0000"
+#endif
+
+#ifndef VERSION
+#define VERSION "1.0-tip"
+#endif
+
 typedef struct {
 	int screen;
 	Window root, win;
 	Pixmap pmap;
-	unsigned long colors[2];
+	unsigned long colors[3];
 } Lock;
 
 static Lock **locks;
 static int nscreens;
 static Bool running = True;
+static Bool spy_mode = False;
 
-static void
-die(const char *errstr, ...) {
+static void die(const char *errstr, ...) {
 	va_list ap;
 
 	va_start(ap, errstr);
@@ -51,24 +67,25 @@ getpw(void) { /* only run as root */
 	struct passwd *pw;
 
 	pw = getpwuid(getuid());
-	if(!pw)
-		die("slock: cannot retrieve password entry (make sure to suid or sgid slock)");
+	if (!pw)
+		die(
+				"slock: cannot retrieve password entry (make sure to suid or sgid slock)");
 	endpwent();
-	rval =  pw->pw_passwd;
+	rval = pw->pw_passwd;
 
 #if HAVE_SHADOW_H
 	if (strlen(rval) >= 1) { /* kludge, assumes pw placeholder entry has len >= 1 */
 		struct spwd *sp;
 		sp = getspnam(getenv("USER"));
 		if(!sp)
-			die("slock: cannot retrieve shadow entry (make sure to suid or sgid slock)\n");
+		die("slock: cannot retrieve shadow entry (make sure to suid or sgid slock)\n");
 		endspent();
 		rval = sp->sp_pwdp;
 	}
 #endif
 
 	/* drop privileges */
-	if(setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0)
+	if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0)
 		die("slock: cannot drop privileges");
 	return rval;
 }
@@ -94,71 +111,95 @@ readpw(Display *dpy, const char *pws)
 	 * had been removed and you can set it with "xset" or some other
 	 * utility. This way the user can easily set a customized DPMS
 	 * timeout. */
-	while(running && !XNextEvent(dpy, &ev)) {
-		if(ev.type == KeyPress) {
-			buf[0] = 0;
-			num = XLookupString(&ev.xkey, buf, sizeof buf, &ksym, 0);
-			if(IsKeypadKey(ksym)) {
-				if(ksym == XK_KP_Enter)
-					ksym = XK_Return;
-				else if(ksym >= XK_KP_0 && ksym <= XK_KP_9)
-					ksym = (ksym - XK_KP_0) + XK_0;
-			}
-			if(IsFunctionKey(ksym) || IsKeypadKey(ksym)
-					|| IsMiscFunctionKey(ksym) || IsPFKey(ksym)
-					|| IsPrivateKeypadKey(ksym))
-				continue;
-			switch(ksym) {
-			case XK_Return:
-				passwd[len] = 0;
+	while (running && !XNextEvent(dpy, &ev)) {
+		switch(ev.type) {
+
+			case KeyPress:
+
+				buf[0] = 0;
+				num = XLookupString(&ev.xkey, buf, sizeof buf, &ksym, 0);
+				if (IsKeypadKey(ksym)) {
+					if (ksym == XK_KP_Enter)
+						ksym = XK_Return;
+					else if (ksym >= XK_KP_0 && ksym <= XK_KP_9)
+						ksym = (ksym - XK_KP_0) + XK_0;
+				}
+				if (IsFunctionKey(ksym) || IsKeypadKey(ksym)
+						|| IsMiscFunctionKey(ksym) || IsPFKey(ksym)
+						|| IsPrivateKeypadKey(ksym))
+					continue;
+				switch (ksym) {
+				case XK_Return:
+					passwd[len] = 0;
 #ifdef HAVE_BSD_AUTH
-				running = !auth_userokay(getlogin(), NULL, "auth-xlock", passwd);
+					running = !auth_userokay(getlogin(), NULL, "auth-xlock", passwd);
 #else
-				running = strcmp(crypt(passwd, pws), pws);
+					running = strcmp(crypt(passwd, pws), pws);
 #endif
-				if(running != False)
-					XBell(dpy, 100);
-				len = 0;
+					if (running != False)
+						XBell(dpy, 100);
+					len = 0;
+					break;
+				case XK_Escape:
+					len = 0;
+					break;
+				case XK_BackSpace:
+					if (len)
+						--len;
+					break;
+				default:
+					if (num && !iscntrl((int) buf[0])
+							&& (len + num < sizeof passwd)) {
+						memcpy(passwd + len, buf, num);
+						len += num;
+					}
+					break;
+				}
+				if (llen == 0 && len != 0) {
+					for (screen = 0; screen < nscreens; screen++) {
+						XSetWindowBackground(dpy, locks[screen]->win,
+								locks[screen]->colors[1]);
+						XClearWindow(dpy, locks[screen]->win);
+					}
+				} else if (llen != 0 && len == 0) {
+					for (screen = 0; screen < nscreens; screen++) {
+						XSetWindowBackground(dpy, locks[screen]->win,
+								locks[screen]->colors[0]);
+						XClearWindow(dpy, locks[screen]->win);
+					}
+				}
+				llen = len;
 				break;
-			case XK_Escape:
-				len = 0;
+
+			case ButtonPress:
+
+				if(spy_mode) {
+					for (screen = 0; screen < nscreens; screen++) {
+						XSetWindowBackground(dpy, locks[screen]->win,
+								locks[screen]->colors[2]);
+						XClearWindow(dpy, locks[screen]->win);
+					}
+				}
+
 				break;
-			case XK_BackSpace:
-				if(len)
-					--len;
-				break;
+
 			default:
-				if(num && !iscntrl((int) buf[0]) && (len + num < sizeof passwd)) { 
-					memcpy(passwd + len, buf, num);
-					len += num;
-				}
+
+				for (screen = 0; screen < nscreens; screen++)
+								XRaiseWindow(dpy, locks[screen]->win);
+
 				break;
-			}
-			if(llen == 0 && len != 0) {
-				for(screen = 0; screen < nscreens; screen++) {
-					XSetWindowBackground(dpy, locks[screen]->win, locks[screen]->colors[1]);
-					XClearWindow(dpy, locks[screen]->win);
-				}
-			} else if(llen != 0 && len == 0) {
-				for(screen = 0; screen < nscreens; screen++) {
-					XSetWindowBackground(dpy, locks[screen]->win, locks[screen]->colors[0]);
-					XClearWindow(dpy, locks[screen]->win);
-				}
-			}
-			llen = len;
 		}
-		else for(screen = 0; screen < nscreens; screen++)
-			XRaiseWindow(dpy, locks[screen]->win);
+
 	}
 }
 
-static void
-unlockscreen(Display *dpy, Lock *lock) {
-	if(dpy == NULL || lock == NULL)
+static void unlockscreen(Display *dpy, Lock *lock) {
+	if (dpy == NULL || lock == NULL )
 		return;
 
 	XUngrabPointer(dpy, CurrentTime);
-	XFreeColors(dpy, DefaultColormap(dpy, lock->screen), lock->colors, 2, 0);
+	XFreeColors(dpy, DefaultColormap(dpy, lock->screen) , lock->colors, 2, 0);
 	XFreePixmap(dpy, lock->pmap);
 	XDestroyWindow(dpy, lock->win);
 
@@ -167,100 +208,105 @@ unlockscreen(Display *dpy, Lock *lock) {
 
 static Lock *
 lockscreen(Display *dpy, int screen) {
-	char curs[] = {0, 0, 0, 0, 0, 0, 0, 0};
+	char curs[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 	unsigned int len;
 	Lock *lock;
 	XColor color, dummy;
 	XSetWindowAttributes wa;
 	Cursor invisible;
 
-	if(dpy == NULL || screen < 0)
-		return NULL;
+	if (dpy == NULL || screen < 0)
+		return NULL ;
 
 	lock = malloc(sizeof(Lock));
-	if(lock == NULL)
-		return NULL;
+	if (lock == NULL )
+		return NULL ;
 
 	lock->screen = screen;
 
-	lock->root = RootWindow(dpy, lock->screen);
+	lock->root = RootWindow(dpy, lock->screen) ;
 
 	/* init */
 	wa.override_redirect = 1;
-	wa.background_pixel = BlackPixel(dpy, lock->screen);
-	lock->win = XCreateWindow(dpy, lock->root, 0, 0, DisplayWidth(dpy, lock->screen), DisplayHeight(dpy, lock->screen),
+	wa.background_pixel = BlackPixel(dpy, lock->screen) ;
+	lock->win = XCreateWindow(dpy, lock->root, 0, 0,
+			DisplayWidth(dpy, lock->screen) , DisplayHeight(dpy, lock->screen),
 			0, DefaultDepth(dpy, lock->screen), CopyFromParent,
-			DefaultVisual(dpy, lock->screen), CWOverrideRedirect | CWBackPixel, &wa);
-	XAllocNamedColor(dpy, DefaultColormap(dpy, lock->screen), COLOR2, &color, &dummy);
+			DefaultVisual(dpy, lock->screen), CWOverrideRedirect | CWBackPixel, &wa) ;
+	XAllocNamedColor(dpy, DefaultColormap(dpy, lock->screen) , COLOR3, &color, &dummy);
+	lock->colors[2] = color.pixel;
+	XAllocNamedColor(dpy, DefaultColormap(dpy, lock->screen) , COLOR2, &color, &dummy);
 	lock->colors[1] = color.pixel;
-	XAllocNamedColor(dpy, DefaultColormap(dpy, lock->screen), COLOR1, &color, &dummy);
+	XAllocNamedColor(dpy, DefaultColormap(dpy, lock->screen) , COLOR1, &color, &dummy);
 	lock->colors[0] = color.pixel;
 	lock->pmap = XCreateBitmapFromData(dpy, lock->win, curs, 8, 8);
-	invisible = XCreatePixmapCursor(dpy, lock->pmap, lock->pmap, &color, &color, 0, 0);
+	invisible = XCreatePixmapCursor(dpy, lock->pmap, lock->pmap, &color, &color,
+			0, 0);
 	XDefineCursor(dpy, lock->win, invisible);
 	XMapRaised(dpy, lock->win);
-	for(len = 1000; len; len--) {
-		if(XGrabPointer(dpy, lock->root, False, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-			GrabModeAsync, GrabModeAsync, None, invisible, CurrentTime) == GrabSuccess)
+	for (len = 1000; len; len--) {
+		if (XGrabPointer(dpy, lock->root, False,
+				ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+				GrabModeAsync, GrabModeAsync, None, invisible,
+				CurrentTime) == GrabSuccess)
 			break;
 		usleep(1000);
 	}
-	if(running && (len > 0)) {
-		for(len = 1000; len; len--) {
-			if(XGrabKeyboard(dpy, lock->root, True, GrabModeAsync, GrabModeAsync, CurrentTime)
-				== GrabSuccess)
+	if (running && (len > 0)) {
+		for (len = 1000; len; len--) {
+			if (XGrabKeyboard(dpy, lock->root, True, GrabModeAsync,
+					GrabModeAsync, CurrentTime) == GrabSuccess)
 				break;
 			usleep(1000);
 		}
 	}
 
 	running &= (len > 0);
-	if(!running) {
+	if (!running) {
 		unlockscreen(dpy, lock);
 		lock = NULL;
-	}
-	else 
+	} else
 		XSelectInput(dpy, lock->root, SubstructureNotifyMask);
 
 	return lock;
 }
 
-static void
-usage(void) {
-	fprintf(stderr, "usage: slock [-v]\n");
+static void usage(void) {
+	fprintf(stderr, "usage: slock [-v] [-spy] [-h]\n");
 	exit(EXIT_FAILURE);
 }
 
-int
-main(int argc, char **argv) {
+int main(int argc, char **argv) {
 #ifndef HAVE_BSD_AUTH
 	const char *pws;
 #endif
 	Display *dpy;
 	int screen;
 
-	if((argc == 2) && !strcmp("-v", argv[1]))
+	if ((argc == 2) && !strcmp("-v", argv[1]))
 		die("slock-%s, © 2006-2012 Anselm R Garbe\n", VERSION);
-	else if(argc != 1)
+	if ((argc == 2) && !strcmp("-spy", argv[1]))
+		spy_mode = True;
+	if ((argc == 2) && !strcmp("-h", argv[1]))
 		usage();
 
-	if(!getpwuid(getuid()))
+	if (!getpwuid(getuid()))
 		die("slock: no passwd entry for you");
 
 #ifndef HAVE_BSD_AUTH
 	pws = getpw();
 #endif
 
-	if(!(dpy = XOpenDisplay(0)))
+	if (!(dpy = XOpenDisplay(0)))
 		die("slock: cannot open display");
 	/* Get the number of screens in display "dpy" and blank them all. */
 	nscreens = ScreenCount(dpy);
 	locks = malloc(sizeof(Lock *) * nscreens);
-	if(locks == NULL)
+	if (locks == NULL )
 		die("slock: malloc: %s", strerror(errno));
 	int nlocks = 0;
-	for(screen = 0; screen < nscreens; screen++) {
-		if ( (locks[screen] = lockscreen(dpy, screen)) != NULL)
+	for (screen = 0; screen < nscreens; screen++) {
+		if ((locks[screen] = lockscreen(dpy, screen)) != NULL )
 			nlocks++;
 	}
 	XSync(dpy, False);
@@ -280,7 +326,7 @@ main(int argc, char **argv) {
 #endif
 
 	/* Password ok, unlock everything and quit. */
-	for(screen = 0; screen < nscreens; screen++)
+	for (screen = 0; screen < nscreens; screen++)
 		unlockscreen(dpy, locks[screen]);
 
 	free(locks);
