@@ -16,6 +16,8 @@
 #include <X11/keysym.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/cursorfont.h>
+#include <giblib/gib_imlib.h>
 
 #if HAVE_BSD_AUTH
 #include <login_cap.h>
@@ -230,7 +232,7 @@ static Lock * lockscreen(Display *dpy, int screen)
 	XColor color, dummy;
 
 	XSetWindowAttributes wa;
-	Cursor invisible;
+	Cursor cursor;
 
 	if (dpy == NULL || screen < 0)
 		return NULL ;
@@ -261,15 +263,20 @@ static Lock * lockscreen(Display *dpy, int screen)
 
 	lock->pmap = XCreateBitmapFromData(dpy, lock->win, curs, 8, 8);
 
-	invisible = XCreatePixmapCursor(dpy, lock->pmap, lock->pmap, &color, &color,
-			0, 0);
-	XDefineCursor(dpy, lock->win, invisible);
+	if(spy_mode)
+		// non-invisible cursor to let people beleive that the screen isn't locked
+		cursor = XCreateFontCursor(dpy, XC_top_left_arrow);
+	else
+		// invisible cursor
+		cursor = XCreatePixmapCursor(dpy, lock->pmap, lock->pmap, &color, &color, 0, 0);
+
+	XDefineCursor(dpy, lock->win, cursor);
 	XMapRaised(dpy, lock->win);
 	for (len = 1000; len; len--)
 	{
 		if (XGrabPointer(dpy, lock->root, False,
 				ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-				GrabModeAsync, GrabModeAsync, None, invisible,
+				GrabModeAsync, GrabModeAsync, None, cursor,
 				CurrentTime) == GrabSuccess)
 			break;
 		usleep(1000);
