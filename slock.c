@@ -166,20 +166,26 @@ static void readpw(Display *dpy, const char *pws)
 			}
 			if (llen == 0 && len != 0)
 			{
-				for (screen = 0; screen < nscreens; screen++)
+				if(!spy_mode)
 				{
-					XSetWindowBackground(dpy, locks[screen]->win,
-							locks[screen]->colors[1]);
-					XClearWindow(dpy, locks[screen]->win);
+					for (screen = 0; screen < nscreens; screen++)
+					{
+						XSetWindowBackground(dpy, locks[screen]->win,
+								locks[screen]->colors[1]);
+						XClearWindow(dpy, locks[screen]->win);
+					}
 				}
 			}
 			else if (llen != 0 && len == 0)
 			{
-				for (screen = 0; screen < nscreens; screen++)
+				if(!spy_mode)
 				{
-					XSetWindowBackground(dpy, locks[screen]->win,
-							locks[screen]->colors[0]);
-					XClearWindow(dpy, locks[screen]->win);
+					for (screen = 0; screen < nscreens; screen++)
+					{
+						XSetWindowBackground(dpy, locks[screen]->win,
+								locks[screen]->colors[0]);
+						XClearWindow(dpy, locks[screen]->win);
+					}
 				}
 			}
 			llen = len;
