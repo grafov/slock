@@ -6,12 +6,15 @@ VERSION = 1.0-tip
 # paths
 PREFIX = /usr/local
 
-X11INC = /usr/X11R6/include
-X11LIB = /usr/X11R6/lib
+#X11INC = /usr/X11R6/include
+#X11LIB = /usr/X11R6/lib
+
+X11INC = /usr/include/X11
+X11LIB = /usr/lib/X11
 
 # includes and libs
 INCS = -I. -I/usr/include -I${X11INC}
-LIBS = -L/usr/lib -lc -lcrypt -L${X11LIB} -lX11 -lXext
+LIBS = -L/usr/lib -lc -lcrypt -L${X11LIB} `pkg-config --libs giblib`
 
 # flags
 CPPFLAGS = -DVERSION=\"${VERSION}\" -DHAVE_SHADOW_H -DCOLOR1=\"black\" -DCOLOR2=\"\#005577\"
