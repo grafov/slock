@@ -203,6 +203,50 @@ static void readpw(Display *dpy, const char *pws)
 				change_background(screen, nscreens, dpy, locks, 0);
 				// generate a sound
 				XBell(dpy, 100);
+
+				char *fontname;
+				XFontStruct *font;
+				char *text = "KERNEL PANIC";
+				int text_width;
+				int textx, texty;
+
+		        fontname = "*clearlyu-medium-r-normal--0-0*";
+		        font = XLoadQueryFont(dpy, fontname);
+		        if (!font) {
+		                fprintf(stderr, "unable to load preferred font: %s using fixed", fontname);
+		        }
+		        else
+		        {
+					XGCValues values;
+					values.font = font->fid;
+
+					fprintf( stdout, "%d/n", nscreens);
+
+					GC pen = XCreateGC(dpy, locks[0]->win, GCForeground|GCLineWidth|GCFont, &values);
+					text_width = XTextWidth(font, text, strlen(text));
+					fprintf(stdout, "%d\n", text_width);
+
+					int width = 800;
+					int height = 800;
+
+					textx = (width - text_width)/2;
+					texty = (height + font->ascent)/2;
+
+					fprintf(stdout, "textx: %d\n", textx);
+					fprintf(stdout, "texty: %d\n", texty);
+					for(int i=0; i<100; i++)
+					{
+						XDrawString(dpy, locks[0]->win, pen, 20, 20+20*i, text, strlen(text));
+						XBell(dpy, 100);
+						XFlush(dpy);
+						usleep(500000);
+
+						// the screen locker blocks as long as this loop is running
+						// so a break is forced here until a solution is found to
+						// process X events in this place
+						break;
+					}
+		        }
 			}
 
 			break;
@@ -341,7 +385,7 @@ int main(int argc, char **argv)
 	int screen;
 
 	if ((argc == 2) && !strcmp("-v", argv[1]))
-		die("slock-%s, © 2006-2012 Anselm R Garbe\n", VERSION);
+		die("slock-%s, (C) 2006-2012 Anselm R Garbe\n", VERSION);
 	if ((argc == 2) && !strcmp("-spy", argv[1]))
 		spy_mode = True;
 	if ((argc == 2) && !strcmp("-h", argv[1]))
