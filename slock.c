@@ -273,8 +273,8 @@ static Lock * lockscreen(Display *dpy, int screen)
 
 	lock->pmap = XCreateBitmapFromData(dpy, lock->win, curs, 8, 8);
 
-	if(!spy_mode)
-	//{
+	if(spy_mode)
+	{
 		// non-invisible cursor to let people beleive that the screen isn't locked
 		// TODO: no need for a visible cursor since the window value mask is CWOverrideRedirect
 		//cursor = XCreateFontCursor(dpy, XC_top_left_arrow);
@@ -285,9 +285,9 @@ static Lock * lockscreen(Display *dpy, int screen)
 		//   If a window has a background (almost all do), it obscures the other window for purposes of out-
 		//   put. Attempts to output to the obscured area do nothing, and no input events (for example,
 		//   pointer motion) are generated for the obscured area.
-		//XMoveWindow(dpy, lock->win, DisplayWidth(dpy, lock->screen), DisplayHeight(dpy, lock->screen));
-	//}
-	//else
+		XMoveWindow(dpy, lock->win, DisplayWidth(dpy, lock->screen), DisplayHeight(dpy, lock->screen));
+	}
+	else
 		// invisible cursor
 		cursor = XCreatePixmapCursor(dpy, lock->pmap, lock->pmap, &color, &color, 0, 0);
 
