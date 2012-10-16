@@ -19,6 +19,8 @@
 #include <X11/cursorfont.h>
 #include <giblib/gib_imlib.h>
 
+#include <X11/X.h>
+
 #if HAVE_BSD_AUTH
 #include <login_cap.h>
 #include <bsd_auth.h>
@@ -96,6 +98,19 @@ static const char * getpw(void)
 }
 #endif
 
+static void change_background(int screen, int nscreens,
+		Display* dpy, Lock** locks, int color)
+{
+	for (screen = 0; screen < nscreens; screen++)
+	{
+		if(spy_mode)
+			XMoveWindow(dpy, locks[screen]->win, 0, 0);
+
+		XSetWindowBackground(dpy, locks[screen]->win, locks[screen]->colors[color]);
+		XClearWindow(dpy, locks[screen]->win);
+	}
+}
+
 #ifdef HAVE_BSD_AUTH
 static void readpw(Display *dpy)
 #else
@@ -164,30 +179,18 @@ static void readpw(Display *dpy, const char *pws)
 				}
 				break;
 			}
+
 			if (llen == 0 && len != 0)
 			{
 				if(!spy_mode)
-				{
-					for (screen = 0; screen < nscreens; screen++)
-					{
-						XSetWindowBackground(dpy, locks[screen]->win,
-								locks[screen]->colors[1]);
-						XClearWindow(dpy, locks[screen]->win);
-					}
-				}
+					change_background(screen, nscreens, dpy, locks, 1);
 			}
 			else if (llen != 0 && len == 0)
 			{
 				if(!spy_mode)
-				{
-					for (screen = 0; screen < nscreens; screen++)
-					{
-						XSetWindowBackground(dpy, locks[screen]->win,
-								locks[screen]->colors[0]);
-						XClearWindow(dpy, locks[screen]->win);
-					}
-				}
+					change_background(screen, nscreens, dpy, locks, 0);
 			}
+
 			llen = len;
 			break;
 
@@ -195,12 +198,11 @@ static void readpw(Display *dpy, const char *pws)
 
 			if (spy_mode)
 			{
-				for (screen = 0; screen < nscreens; screen++)
-				{
-					XSetWindowBackground(dpy, locks[screen]->win,
-							locks[screen]->colors[2]);
-					XClearWindow(dpy, locks[screen]->win);
-				}
+				// to shock the intruder, wait little time
+				sleep(1.5);
+				change_background(screen, nscreens, dpy, locks, 0);
+				// generate a sound
+				XBell(dpy, 100);
 			}
 
 			break;
@@ -249,16 +251,18 @@ static Lock * lockscreen(Display *dpy, int screen)
 
 	lock->screen = screen;
 
-	lock->root = RootWindow(dpy, lock->screen) ;
+	lock->root = RootWindow(dpy, lock->screen);
 
 	/* init */
 	wa.override_redirect = 1;
-	wa.background_pixel = BlackPixel(dpy, lock->screen) ;
+	wa.background_pixel = BlackPixel(dpy, lock->screen);
 
 	lock->win = XCreateWindow(dpy, lock->root, 0, 0,
 			DisplayWidth(dpy, lock->screen) , DisplayHeight(dpy, lock->screen),
 			0, DefaultDepth(dpy, lock->screen), CopyFromParent,
-			DefaultVisual(dpy, lock->screen), CWOverrideRedirect | CWBackPixel, &wa) ;
+			DefaultVisual(dpy, lock->screen),
+			(spy_mode) ? CWOverrideRedirect : CWOverrideRedirect | CWBackPixel,
+			&wa) ;
 
 	XAllocNamedColor(dpy, DefaultColormap(dpy, lock->screen) , COLOR3, &color, &dummy);
 	lock->colors[2] = color.pixel;
@@ -269,15 +273,27 @@ static Lock * lockscreen(Display *dpy, int screen)
 
 	lock->pmap = XCreateBitmapFromData(dpy, lock->win, curs, 8, 8);
 
-	if(spy_mode)
+	if(!spy_mode)
+	//{
 		// non-invisible cursor to let people beleive that the screen isn't locked
-		cursor = XCreateFontCursor(dpy, XC_top_left_arrow);
-	else
+		// TODO: no need for a visible cursor since the window value mask is CWOverrideRedirect
+		//cursor = XCreateFontCursor(dpy, XC_top_left_arrow);
+
+		// To simulate a non-locked screen, it's necessary to move the window instead
+		// of making the background opaque for this reason:
+		//
+		//   If a window has a background (almost all do), it obscures the other window for purposes of out-
+		//   put. Attempts to output to the obscured area do nothing, and no input events (for example,
+		//   pointer motion) are generated for the obscured area.
+		//XMoveWindow(dpy, lock->win, DisplayWidth(dpy, lock->screen), DisplayHeight(dpy, lock->screen));
+	//}
+	//else
 		// invisible cursor
 		cursor = XCreatePixmapCursor(dpy, lock->pmap, lock->pmap, &color, &color, 0, 0);
 
 	XDefineCursor(dpy, lock->win, cursor);
 	XMapRaised(dpy, lock->win);
+
 	for (len = 1000; len; len--)
 	{
 		if (XGrabPointer(dpy, lock->root, False,
