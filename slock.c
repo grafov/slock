@@ -55,6 +55,7 @@ static Lock **locks;
 static int nscreens;
 static Bool running = True;
 static Bool spy_mode = False;
+static Bool ergo = False;
 
 static void die(const char *errstr, ...)
 {
@@ -150,33 +151,59 @@ static void readpw(Display *dpy, const char *pws)
 					|| IsMiscFunctionKey(ksym) || IsPFKey(ksym)
 					|| IsPrivateKeypadKey(ksym))
 				continue;
+
 			switch (ksym)
 			{
-			case XK_Return:
-				passwd[len] = 0;
-#ifdef HAVE_BSD_AUTH
-				running = !auth_userokay(getlogin(), NULL, "auth-xlock", passwd);
-#else
-				running = strcmp(crypt(passwd, pws), pws);
-#endif
-				if (running != False)
-					XBell(dpy, 100);
-				len = 0;
-				break;
+
 			case XK_Escape:
+
 				len = 0;
 				break;
+
 			case XK_BackSpace:
+
 				if (len)
 					--len;
 				break;
+
+			case XK_Return:
+
+				// if not in ergonomic mode, check here if the password is typed in is correct
+				if(!ergo)
+				{
+					passwd[len] = 0;
+#ifdef HAVE_BSD_AUTH
+					running = !auth_userokay(getlogin(), NULL, "auth-xlock", passwd);
+#else
+					running = strcmp(crypt(passwd, pws), pws);
+#endif
+					if (running != False)
+						XBell(dpy, 100);
+					len = 0;
+
+					break;
+				}
+
 			default:
+
 				if (num && !iscntrl((int) buf[0])
 						&& (len + num < sizeof passwd))
 				{
 					memcpy(passwd + len, buf, num);
 					len += num;
 				}
+
+				// if in ergonomic mode, check here if the password is typed in so far is correct
+				if(ergo)
+				{
+					passwd[len] = 0;
+#ifdef HAVE_BSD_AUTH
+					running = !auth_userokay(getlogin(), NULL, "auth-xlock", passwd);
+#else
+					running = strcmp(crypt(passwd, pws), pws);
+#endif
+				}
+
 				break;
 			}
 
@@ -372,7 +399,7 @@ static Lock * lockscreen(Display *dpy, int screen)
 
 static void usage(void)
 {
-	fprintf(stderr, "usage: slock [-v] [-spy] [-h]\n");
+	fprintf(stderr, "usage: slock [-v] [-spy] [-e] [-h]\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -384,10 +411,14 @@ int main(int argc, char **argv)
 	Display *dpy;
 	int screen;
 
+	// TODO: iterate over all the passed arguments, this implementation
+	//       here only allows one argument at the same time
 	if ((argc == 2) && !strcmp("-v", argv[1]))
 		die("slock-%s, (C) 2006-2012 Anselm R Garbe\n", VERSION);
 	if ((argc == 2) && !strcmp("-spy", argv[1]))
 		spy_mode = True;
+	if ((argc == 2) && !strcmp("-e", argv[1]))
+		ergo = True;
 	if ((argc == 2) && !strcmp("-h", argv[1]))
 		usage();
 

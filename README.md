@@ -1,3 +1,6 @@
+Fork of great `slock` with little ergonomic change: you don't need to press Enter after a password typed. Just type your password the screen will unlocked. One key press lesser, sucks even less :)
+
+
 slock - simple screen locker
 ============================
 simple screen locker utility for X. 
