@@ -17,9 +17,9 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/cursorfont.h>
-#include <giblib/gib_imlib.h>
-
 #include <X11/X.h>
+#include <X11/Xatom.h>
+#include <giblib/gib_imlib.h>
 
 #if HAVE_BSD_AUTH
 #include <login_cap.h>
@@ -56,6 +56,7 @@ static int nscreens;
 static Bool running = True;
 static Bool spy_mode = False;
 static Bool ergo = False;
+static double opacity = 0.5;
 
 static void die(const char *errstr, ...)
 {
@@ -392,14 +393,23 @@ static Lock * lockscreen(Display *dpy, int screen)
 		lock = NULL;
 	}
 	else
+	{
+		// TODO: the opacity doesn't work, is this an issue in archlinux?
 		XSelectInput(dpy, lock->root, SubstructureNotifyMask);
+		unsigned int value = (unsigned int) (opacity * 0xffffffff);
+		XChangeProperty(dpy, lock->win,
+				XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False),
+				XA_CARDINAL, 32, PropModeReplace,
+				(unsigned char *) &value, 1L);
+		XSync(dpy, False);
+	}
 
 	return lock;
 }
 
 static void usage(void)
 {
-	fprintf(stderr, "usage: slock [-v] [-spy] [-e] [-h]\n");
+	fprintf(stderr, "usage: slock [-v] [-s] [-e] [-h] [-o <OPACITY>]\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -411,16 +421,31 @@ int main(int argc, char **argv)
 	Display *dpy;
 	int screen;
 
-	// TODO: iterate over all the passed arguments, this implementation
-	//       here only allows one argument at the same time
-	if ((argc == 2) && !strcmp("-v", argv[1]))
-		die("slock-%s, (C) 2006-2012 Anselm R Garbe\n", VERSION);
-	if ((argc == 2) && !strcmp("-spy", argv[1]))
-		spy_mode = True;
-	if ((argc == 2) && !strcmp("-e", argv[1]))
-		ergo = True;
-	if ((argc == 2) && !strcmp("-h", argv[1]))
-		usage();
+	{
+		int result;
+		while((result = getopt(argc,argv,"vo:seh")) != -1) {
+			switch(result) {
+				case 'v':
+					die("slock-%s, © 2006-2012 Anselm R Garbe\n", VERSION);
+				case 'o':
+					opacity = atof(optarg);
+					printf("%f\n", opacity);
+					break;
+				case 's':
+					spy_mode = True;
+					break;
+				case 'e':
+					ergo = True;
+					break;
+				case 'h':
+				case '?':
+					usage();
+					break;
+			}
+		}
+		if ((argc - optind) > 0)
+			usage();
+	}
 
 	if (!getpwuid(getuid()))
 		die("slock: no passwd entry for you");
