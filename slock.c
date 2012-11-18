@@ -6,9 +6,11 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <IL/ilu.h>
 #include <pwd.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -19,7 +21,6 @@
 #include <X11/cursorfont.h>
 #include <X11/X.h>
 #include <X11/Xatom.h>
-#include <giblib/gib_imlib.h>
 
 #if HAVE_BSD_AUTH
 #include <login_cap.h>
@@ -111,6 +112,50 @@ static void change_background(int screen, int nscreens,
 		XSetWindowBackground(dpy, locks[screen]->win, locks[screen]->colors[color]);
 		XClearWindow(dpy, locks[screen]->win);
 	}
+}
+
+static XImage * create_ximage(Display* display)
+{
+	XImage *ximage;
+
+	ilInit();
+	ILuint ImgId = 0;
+	ilGenImages(1, &ImgId);
+	ilBindImage(ImgId);
+	ILboolean success = ilLoadImage("/tmp/slock/00000001.png");
+
+	if (success)
+	{
+		fprintf(stdout, "Image loaded\n");
+
+		ILint image_width = ilGetInteger(IL_IMAGE_WIDTH);
+		ILint image_height = ilGetInteger(IL_IMAGE_HEIGHT);
+
+		fprintf(stdout, "Width:%d\n", image_width);
+		fprintf(stdout, "Height:%d\n", image_height);
+
+		uint32_t background_pixels[image_width * image_height];
+
+		int i = 0;
+		for (; i < (image_width * image_height); i++)
+			background_pixels[i] = 0;
+
+		ilCopyPixels(0, 0, 0, image_width, image_height, 1, IL_BGRA,
+				IL_UNSIGNED_BYTE, &background_pixels);
+
+		ximage = XCreateImage(display,
+				XDefaultVisual(display, XDefaultScreen(display)),
+				XDefaultDepth(display, XDefaultScreen(display)), ZPixmap, 0,
+				background_pixels, image_width, image_height, 32, 0);
+
+	}
+	else
+		fprintf(stdout, "Image not loaded\n");
+
+	ilBindImage(0);
+	ilDeleteImages(1, &ImgId);
+
+	return ximage;
 }
 
 #ifdef HAVE_BSD_AUTH
@@ -226,8 +271,11 @@ static void readpw(Display *dpy, const char *pws)
 
 			if (spy_mode)
 			{
+				// take a screenshot from the webcam saved as /tmp/slock/00000001.png
+				system("mkdir -p /tmp/slock; /usr/bin/env mplayer -really-quiet -vo png:outdir=/tmp/slock -frames 1 tv://");
+
 				// to shock the intruder, wait little time
-				sleep(1.5);
+				sleep(2);
 				change_background(screen, nscreens, dpy, locks, 0);
 				// generate a sound
 				XBell(dpy, 100);
@@ -248,11 +296,10 @@ static void readpw(Display *dpy, const char *pws)
 					XGCValues values;
 					values.font = font->fid;
 
-					fprintf( stdout, "%d/n", nscreens);
+					fprintf( stdout, "Screens found: %d\n", nscreens);
 
 					GC pen = XCreateGC(dpy, locks[0]->win, GCForeground|GCLineWidth|GCFont, &values);
 					text_width = XTextWidth(font, text, strlen(text));
-					fprintf(stdout, "%d\n", text_width);
 
 					int width = 800;
 					int height = 800;
@@ -260,20 +307,32 @@ static void readpw(Display *dpy, const char *pws)
 					textx = (width - text_width)/2;
 					texty = (height + font->ascent)/2;
 
-					fprintf(stdout, "textx: %d\n", textx);
-					fprintf(stdout, "texty: %d\n", texty);
-					for(int i=0; i<100; i++)
+					for(int i=0; i<10; i++)
 					{
-						XDrawString(dpy, locks[0]->win, pen, 20, 20+20*i, text, strlen(text));
+						XDrawString(dpy, locks[0]->win, pen, 20, 20+100*i, text, strlen(text));
 						XBell(dpy, 100);
 						XFlush(dpy);
-						usleep(500000);
 
-						// the screen locker blocks as long as this loop is running
-						// so a break is forced here until a solution is found to
-						// process X events in this place
-						break;
+						// note: keep this loop as short as possible because the screen locker blocks too long then
+						usleep(50000);
 					}
+
+					sleep(2);
+
+					/* get the geometry of the default screen for our display. */
+					int screen_num = DefaultScreen(dpy);
+					int display_width = DisplayWidth(dpy, screen_num);
+					int display_height = DisplayHeight(dpy, screen_num);
+
+					XImage *snapshot = create_ximage(dpy);
+
+					// the pen context is used for lazyness
+					XPutImage(dpy, locks[0]->win, pen, snapshot, 0, 0,
+							(display_width-snapshot->width)/2,
+							(display_height-snapshot->height)/2,
+							640, 480);
+					XFlush(dpy);
+					XSync(dpy, False);
 		        }
 			}
 

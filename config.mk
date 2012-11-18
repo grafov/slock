@@ -14,7 +14,7 @@ X11LIB = /usr/lib/X11
 
 # includes and libs
 INCS = -I. -I/usr/include -I${X11INC}
-LIBS = -L/usr/lib -lc -lcrypt -L${X11LIB} `pkg-config --libs giblib`
+LIBS = -L/usr/lib -lc -lcrypt -L${X11LIB} -lX11 -lXext `pkg-config --libs ILU`
 
 # flags
 CPPFLAGS = -DVERSION=\"${VERSION}\" -DHAVE_SHADOW_H -DCOLOR1=\"black\" -DCOLOR2=\"\#005577\"
