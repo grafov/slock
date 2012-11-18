@@ -33,3 +33,8 @@ Lock X by displaying a black screen and waiting for your input.
 `slock -s`
 
 Lock X whereas your screen looks unlocked. If a mouse button is hit the screen becomes black, a few _KERNEL PANIC_ messages are displayed and a snapshot of the unwanted user is taken and rendered. The spy mode requires mplayer to be installed which is responsible for the webcam snapshot.
+
+Exit slock
+----------
+
+Just enter your password.
