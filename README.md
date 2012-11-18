@@ -1,27 +1,35 @@
-Fork of great `slock` with little ergonomic change: you don't need to press Enter after a password typed. Just type your password the screen will unlocked. One key press lesser, sucks even less :)
-
-
 slock - simple screen locker
 ============================
-simple screen locker utility for X. 
+
+The most simple screen locker utility available for X.
 
 
 Requirements
 ------------
-In order to build slock you need the Xlib header files.
 
+* [Devil](http://openil.sourceforge.net/)
+* [MPlayer](http://www.mplayerhq.hu) (optional)
 
 Installation
 ------------
-Edit config.mk to match your local setup (slock is installed into
-the /usr/local namespace by default).
 
-Afterwards enter the following command to build and install slock
-(if necessary as root):
+Edit config.mk to match your local setup (slock is installed into the /usr/local namespace by default).
 
-    make clean install
+In order to build and install slock execute
 
+```sudo make clean install```
 
 Running slock
 -------------
-Simply invoke the 'slock' command. To get out of it, enter your password.
+
+<h3>Standard</h3>
+
+`slock`
+
+Lock X by displaying a black screen and waiting for your input.
+
+<h3>Spy Mode</h3>
+
+`slock -s`
+
+Lock X whereas your screen looks unlocked. If a mouse button is hit the screen becomes black, a few _KERNEL PANIC_ messages are displayed and a snapshot of the unwanted user is taken and rendered. The spy mode requires mplayer to be installed which is responsible for the webcam snapshot.
