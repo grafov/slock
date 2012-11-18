@@ -357,6 +357,10 @@ static Lock * lockscreen(Display *dpy, int screen)
 		//   If a window has a background (almost all do), it obscures the other window for purposes of out-
 		//   put. Attempts to output to the obscured area do nothing, and no input events (for example,
 		//   pointer motion) are generated for the obscured area.
+
+		// Note: if the following line is outcommented, the display doesn't become black as it would do
+		//       in the non-spy mode. But the desktop doesn't show desktop updates or in other words
+		//       it's a kind of screenshot hiding the underlying desktop
 		XMoveWindow(dpy, lock->win, DisplayWidth(dpy, lock->screen), DisplayHeight(dpy, lock->screen));
 	}
 	else
