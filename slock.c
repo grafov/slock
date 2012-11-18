@@ -122,7 +122,7 @@ static XImage * create_ximage(Display* display)
 	ILuint ImgId = 0;
 	ilGenImages(1, &ImgId);
 	ilBindImage(ImgId);
-	ILboolean success = ilLoadImage("/tmp/slock/00000001.png");
+	ILboolean success = ilLoadImage("/tmp/spylock/intrudor.jpg");
 
 	if (success)
 	{
@@ -154,6 +154,8 @@ static XImage * create_ximage(Display* display)
 
 	ilBindImage(0);
 	ilDeleteImages(1, &ImgId);
+
+	system("rm -rf /tmp/spylock");
 
 	return ximage;
 }
@@ -272,7 +274,10 @@ static void readpw(Display *dpy, const char *pws)
 			if (spy_mode)
 			{
 				// take a screenshot from the webcam saved as /tmp/slock/00000001.png
-				system("mkdir -p /tmp/slock; /usr/bin/env mplayer -really-quiet -vo png:outdir=/tmp/slock -frames 1 tv://");
+				//system("mkdir -p /tmp/slock; /usr/bin/env mplayer -really-quiet -vo png:outdir=/tmp/slock -frames 1 tv://");
+
+				// fswebcam automatically uses a lower resolution if the webcam doesn't support HD
+				system("mkdir -p /tmp/spylock; /usr/bin/env fswebcam -r 1920x1080 /tmp/spylock/intrudor.jpg");
 
 				// to shock the intruder, wait little time
 				sleep(2);
@@ -299,6 +304,7 @@ static void readpw(Display *dpy, const char *pws)
 					fprintf( stdout, "Screens found: %d\n", nscreens);
 
 					GC pen = XCreateGC(dpy, locks[0]->win, GCForeground|GCLineWidth|GCFont, &values);
+					/*
 					text_width = XTextWidth(font, text, strlen(text));
 
 					int width = 800;
@@ -316,8 +322,9 @@ static void readpw(Display *dpy, const char *pws)
 						// note: keep this loop as short as possible because the screen locker blocks too long then
 						usleep(50000);
 					}
+					//*/
 
-					sleep(2);
+					//sleep(2);
 
 					/* get the geometry of the default screen for our display. */
 					int screen_num = DefaultScreen(dpy);
