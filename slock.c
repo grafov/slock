@@ -116,7 +116,7 @@ static void change_background(int screen, int nscreens,
 
 static XImage * create_ximage(Display* display)
 {
-	XImage *ximage;
+	XImage *ximage = 0;
 
 	ilInit();
 	ILuint ImgId = 0;
@@ -325,15 +325,21 @@ static void readpw(Display *dpy, const char *pws)
 					int display_height = DisplayHeight(dpy, screen_num);
 
 					XImage *snapshot = create_ximage(dpy);
-
-					// the pen context is used for lazyness
-					XPutImage(dpy, locks[0]->win, pen, snapshot, 0, 0,
-							(display_width-snapshot->width)/2,
-							(display_height-snapshot->height)/2,
-							640, 480);
-					XFlush(dpy);
-					XSync(dpy, False);
-		        }
+					
+					if(snapshot)
+					{
+						// the pen context is used for lazyness
+						XPutImage(dpy, locks[0]->win, pen, snapshot, 0, 0,
+								(display_width-snapshot->width)/2,
+								(display_height-snapshot->height)/2,
+								640, 480);
+						XFlush(dpy);
+						XSync(dpy, False);
+						
+						// segfault if called here, must it executed at all? Or does X free the image automagically?
+						//XDestroyImage(snapshot);
+					}
+				}
 			}
 
 			break;
