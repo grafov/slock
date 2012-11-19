@@ -128,6 +128,8 @@ static XImage * create_ximage(Display* display)
 	{
 		fprintf(stdout, "Image loaded\n");
 
+		iluScale(1024, 768, 1);
+
 		ILint image_width = ilGetInteger(IL_IMAGE_WIDTH);
 		ILint image_height = ilGetInteger(IL_IMAGE_HEIGHT);
 
@@ -142,6 +144,9 @@ static XImage * create_ximage(Display* display)
 
 		ilCopyPixels(0, 0, 0, image_width, image_height, 1, IL_BGRA,
 				IL_UNSIGNED_BYTE, &background_pixels);
+
+		fprintf(stdout, "Width:%d\n", ilGetInteger(IL_IMAGE_WIDTH));
+		fprintf(stdout, "Height:%d\n", ilGetInteger(IL_IMAGE_HEIGHT));
 
 		ximage = XCreateImage(display,
 				XDefaultVisual(display, XDefaultScreen(display)),
@@ -280,72 +285,35 @@ static void readpw(Display *dpy, const char *pws)
 				system("mkdir -p /tmp/spylock; /usr/bin/env fswebcam -r 1920x1080 /tmp/spylock/intrudor.jpg");
 
 				// to shock the intruder, wait little time
-				sleep(2);
+				//sleep(2);
 				change_background(screen, nscreens, dpy, locks, 0);
 				// generate a sound
 				XBell(dpy, 100);
 
-				char *fontname;
-				XFontStruct *font;
-				char *text = "KERNEL PANIC";
-				int text_width;
-				int textx, texty;
+				fprintf( stdout, "Screens found: %d\n", nscreens);
 
-		        fontname = "*clearlyu-medium-r-normal--0-0*";
-		        font = XLoadQueryFont(dpy, fontname);
-		        if (!font) {
-		                fprintf(stderr, "unable to load preferred font: %s using fixed", fontname);
-		        }
-		        else
-		        {
-					XGCValues values;
-					values.font = font->fid;
+				/* get the geometry of the default screen for our display. */
+				int screen_num = DefaultScreen(dpy);
+				int display_width = DisplayWidth(dpy, screen_num);
+				int display_height = DisplayHeight(dpy, screen_num);
 
-					fprintf( stdout, "Screens found: %d\n", nscreens);
+				XImage *snapshot = create_ximage(dpy);
 
-					GC pen = XCreateGC(dpy, locks[0]->win, GCForeground|GCLineWidth|GCFont, &values);
-					/*
-					text_width = XTextWidth(font, text, strlen(text));
+				if(snapshot)
+				{
+					GC gc = XCreateGC(dpy, locks[0]->win, 0, 0);
 
-					int width = 800;
-					int height = 800;
+					// copy 1024x764 pixels. XPutImage seems to not segfault
+					// if the width and height exceeds the image dimension
+					XPutImage(dpy, locks[0]->win, gc, snapshot, 0, 0,
+							(display_width-snapshot->width)/2,
+							(display_height-snapshot->height)/2,
+							1024, 764);
+					XFlush(dpy);
+					XSync(dpy, False);
 
-					textx = (width - text_width)/2;
-					texty = (height + font->ascent)/2;
-
-					for(int i=0; i<10; i++)
-					{
-						XDrawString(dpy, locks[0]->win, pen, 20, 20+100*i, text, strlen(text));
-						XBell(dpy, 100);
-						XFlush(dpy);
-
-						// note: keep this loop as short as possible because the screen locker blocks too long then
-						usleep(50000);
-					}
-					//*/
-
-					//sleep(2);
-
-					/* get the geometry of the default screen for our display. */
-					int screen_num = DefaultScreen(dpy);
-					int display_width = DisplayWidth(dpy, screen_num);
-					int display_height = DisplayHeight(dpy, screen_num);
-
-					XImage *snapshot = create_ximage(dpy);
-					
-					if(snapshot)
-					{
-						// the pen context is used for lazyness
-						XPutImage(dpy, locks[0]->win, pen, snapshot, 0, 0,
-								(display_width-snapshot->width)/2,
-								(display_height-snapshot->height)/2,
-								640, 480);
-						XFlush(dpy);
-						XSync(dpy, False);
-						
-						// segfault if called here, must it executed at all? Or does X free the image automagically?
-						//XDestroyImage(snapshot);
-					}
+					// segfault if called here, must it executed at all? Or does X free the image automagically?
+					//XDestroyImage(snapshot);
 				}
 			}
 
