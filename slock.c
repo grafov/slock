@@ -133,9 +133,6 @@ static XImage * create_ximage(Display* display)
 		ILint image_width = ilGetInteger(IL_IMAGE_WIDTH);
 		ILint image_height = ilGetInteger(IL_IMAGE_HEIGHT);
 
-		fprintf(stdout, "Width:%d\n", image_width);
-		fprintf(stdout, "Height:%d\n", image_height);
-
 		uint32_t background_pixels[image_width * image_height];
 
 		int i = 0;
@@ -144,9 +141,6 @@ static XImage * create_ximage(Display* display)
 
 		ilCopyPixels(0, 0, 0, image_width, image_height, 1, IL_BGRA,
 				IL_UNSIGNED_BYTE, &background_pixels);
-
-		fprintf(stdout, "Width:%d\n", ilGetInteger(IL_IMAGE_WIDTH));
-		fprintf(stdout, "Height:%d\n", ilGetInteger(IL_IMAGE_HEIGHT));
 
 		ximage = XCreateImage(display,
 				XDefaultVisual(display, XDefaultScreen(display)),
