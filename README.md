@@ -8,7 +8,7 @@ Requirements
 ------------
 
 * [Devil](http://openil.sourceforge.net/)
-* [fswebca](http://www.firestorm.cx/fswebcam/) (optional)
+* [fswebcam](http://www.firestorm.cx/fswebcam/) (optional)
 
 Installation
 ------------
