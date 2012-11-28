@@ -59,6 +59,10 @@ static Bool spy_mode = False;
 static Bool ergo = False;
 static double opacity = 0.5;
 
+// in the spy mode this is set to true
+// if an unwanted user triggered the webcam
+static Bool enemy_spied = False;
+
 static void die(const char *errstr, ...)
 {
 	va_list ap;
@@ -272,42 +276,47 @@ static void readpw(Display *dpy, const char *pws)
 
 			if (spy_mode)
 			{
-				// take a screenshot from the webcam saved as /tmp/slock/00000001.png
-				//system("mkdir -p /tmp/slock; /usr/bin/env mplayer -really-quiet -vo png:outdir=/tmp/slock -frames 1 tv://");
-
-				// fswebcam automatically uses a lower resolution if the webcam doesn't support HD
-				system("mkdir -p /tmp/spylock; /usr/bin/env fswebcam -r 1920x1080 /tmp/spylock/intrudor.jpg");
-
-				// to shock the intruder, wait little time
-				//sleep(2);
-				change_background(screen, nscreens, dpy, locks, 0);
-				// generate a sound
-				XBell(dpy, 100);
-
-				fprintf( stdout, "Screens found: %d\n", nscreens);
-
-				/* get the geometry of the default screen for our display. */
-				int screen_num = DefaultScreen(dpy);
-				int display_width = DisplayWidth(dpy, screen_num);
-				int display_height = DisplayHeight(dpy, screen_num);
-
-				XImage *snapshot = create_ximage(dpy);
-
-				if(snapshot)
+				if (!enemy_spied)
 				{
-					GC gc = XCreateGC(dpy, locks[0]->win, 0, 0);
-
-					// copy 1024x764 pixels. XPutImage seems to not segfault
-					// if the width and height exceeds the image dimension
-					XPutImage(dpy, locks[0]->win, gc, snapshot, 0, 0,
-							(display_width-snapshot->width)/2,
-							(display_height-snapshot->height)/2,
-							1024, 764);
-					XFlush(dpy);
-					XSync(dpy, False);
-
-					// segfault if called here, must it executed at all? Or does X free the image automagically?
-					//XDestroyImage(snapshot);
+					// take a screenshot from the webcam saved as /tmp/slock/00000001.png
+					//system("mkdir -p /tmp/slock; /usr/bin/env mplayer -really-quiet -vo png:outdir=/tmp/slock -frames 1 tv://");
+	
+					// fswebcam automatically uses a lower resolution if the webcam doesn't support HD
+					system("mkdir -p /tmp/spylock; /usr/bin/env fswebcam -r 1920x1080 /tmp/spylock/intrudor.jpg");
+	
+					// to shock the intruder, wait little time
+					//sleep(2);
+					change_background(screen, nscreens, dpy, locks, 0);
+					// generate a sound
+					XBell(dpy, 100);
+	
+					fprintf( stdout, "Screens found: %d\n", nscreens);
+	
+					/* get the geometry of the default screen for our display. */
+					int screen_num = DefaultScreen(dpy);
+					int display_width = DisplayWidth(dpy, screen_num);
+					int display_height = DisplayHeight(dpy, screen_num);
+	
+					XImage *snapshot = create_ximage(dpy);
+	
+					if(snapshot)
+					{
+						GC gc = XCreateGC(dpy, locks[0]->win, 0, 0);
+	
+						// copy 1024x764 pixels. XPutImage seems to not segfault
+						// if the width and height exceeds the image dimension
+						XPutImage(dpy, locks[0]->win, gc, snapshot, 0, 0,
+								(display_width-snapshot->width)/2,
+								(display_height-snapshot->height)/2,
+								1024, 764);
+						XFlush(dpy);
+						XSync(dpy, False);
+	
+						// segfault if called here, must it executed at all? Or does X free the image automagically?
+						//XDestroyImage(snapshot);
+					}
+					
+					enemy_spied = True;
 				}
 			}
 
