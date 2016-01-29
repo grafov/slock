@@ -1,0 +1,7 @@
+.settings
+slock
+*.o
+.cproject
+.project
+slock
+slock.o
